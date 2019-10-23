@@ -1,5 +1,8 @@
-FROM nvidia/cuda:7.5-cudnn5-devel-ubuntu14.04
+FROM nvidia/cuda:10.1-cudnn7-devel-ubuntu18.04
+
 MAINTAINER caffe-maint@googlegroups.com
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
@@ -7,6 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
         wget \
         libatlas-base-dev \
+	libopenblas-dev \
+	libatlas-base-dev \
         libboost-all-dev \
         libgflags-dev \
         libgoogle-glog-dev \
@@ -34,14 +39,7 @@ RUN git clone -b ssd --depth 1 https://github.com/pietermessely/caffe.git . && \
 
 COPY Makefile.config Makefile.config
 
-RUN ls
-
 RUN make all 
-
-#RUN #mkdir build && cd build && \
-    #cmake -DUSE_CUDNN=1 -DUSE_OPENCV=1 .. && \
-    #make -j"$(nproc)"
-
 ENV PYCAFFE_ROOT $CAFFE_ROOT/python
 ENV PYTHONPATH $PYCAFFE_ROOT:$PYTHONPATH
 ENV PATH $CAFFE_ROOT/build/tools:$PYCAFFE_ROOT:$PATH
