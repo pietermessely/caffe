@@ -25,7 +25,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python-dev \
         python-numpy \
         python-pip \
-        python-scipy && \
+        python-scipy \
+	python-skimage && \
     rm -rf /var/lib/apt/lists/*
 
 ENV CAFFE_ROOT=/opt/caffe
@@ -40,6 +41,7 @@ RUN git clone -b ssd --depth 1 https://github.com/pietermessely/caffe.git . && \
 COPY Makefile.config Makefile.config
 
 RUN make all 
+RUN make pycaffe
 ENV PYCAFFE_ROOT $CAFFE_ROOT/python
 ENV PYTHONPATH $PYCAFFE_ROOT:$PYTHONPATH
 ENV PATH $CAFFE_ROOT/build/tools:$PYCAFFE_ROOT:$PATH
