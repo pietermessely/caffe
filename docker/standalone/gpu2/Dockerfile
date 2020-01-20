@@ -26,8 +26,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python-numpy \
         python-pip \
         python-scipy \
+	python-tk \
+	python-setuptools \
 	python-skimage && \
     rm -rf /var/lib/apt/lists/*
+
+RUN pip install wheel
 
 ENV CAFFE_ROOT=/opt/caffe
 WORKDIR $CAFFE_ROOT
@@ -46,5 +50,12 @@ ENV PYCAFFE_ROOT $CAFFE_ROOT/python
 ENV PYTHONPATH $PYCAFFE_ROOT:$PYTHONPATH
 ENV PATH $CAFFE_ROOT/build/tools:$PYCAFFE_ROOT:$PATH
 RUN echo "$CAFFE_ROOT/build/lib" >> /etc/ld.so.conf.d/caffe.conf && ldconfig
+RUN cp $CAFFE_ROOT/tools/extra/plot_training_log.py.example $CAFFE_ROOT/tools/extra/plot_training_log.py
 
-WORKDIR /workspace
+COPY CreateAnnoset.sh /usr/bin/
+COPY PlotTrainingLog.sh /usr/bin
+
+RUN groupadd -r -g 1000 ubuntu
+RUN useradd -rm -d /home/ubuntu -s /bin/bash -g 1000 -G sudo -u 1000 ubuntu
+USER ubuntu
+WORKDIR /home/ubuntu
