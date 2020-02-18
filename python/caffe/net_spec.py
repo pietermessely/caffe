@@ -148,8 +148,9 @@ class Function(object):
         if self.in_place:
             layer.top.extend(layer.bottom)
         else:
-            for top in self.tops:
-                layer.top.append(self._get_top_name(top, names, autonames))
+            if layer.type != 'Silence':
+                for top in self.tops:
+                    layer.top.append(self._get_top_name(top, names, autonames))
         layer.name = self._get_name(names, autonames)
 
         for k, v in six.iteritems(self.params):
@@ -158,8 +159,12 @@ class Function(object):
                 assign_proto(layer, k, v)
             else:
                 try:
-                    assign_proto(getattr(layer,
-                        _param_names[self.type_name] + '_param'), k, v)
+                    if self.type_name == 'Deconvolution':
+                        assign_proto(getattr(layer,
+                            _param_names['Convolution'] + '_param'), k, v)
+                    else:
+                        assign_proto(getattr(layer,
+                            _param_names[self.type_name] + '_param'), k, v)
                 except (AttributeError, KeyError):
                     assign_proto(layer, k, v)
 

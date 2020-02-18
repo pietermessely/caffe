@@ -39,45 +39,14 @@ def ConvBNLayer(net, from_layer, out_layer, use_bn, use_relu, num_output,
         'weight_filler': dict(type='gaussian', std=0.01),
         'bias_term': False,
         }
-    eps = bn_params.get('eps', 0.001)
-    moving_average_fraction = bn_params.get('moving_average_fraction', 0.999)
-    use_global_stats = bn_params.get('use_global_stats', False)
-    # parameters for batchnorm layer.
-    bn_kwargs = {
-        'param': [
-            dict(lr_mult=0, decay_mult=0),
-            dict(lr_mult=0, decay_mult=0),
-            dict(lr_mult=0, decay_mult=0)],
-        'eps': eps,
-        'moving_average_fraction': moving_average_fraction,
-        }
-    bn_lr_mult = lr_mult
-    if use_global_stats:
-      # only specify if use_global_stats is explicitly provided;
-      # otherwise, use_global_stats_ = this->phase_ == TEST;
-      bn_kwargs = {
-          'param': [
-              dict(lr_mult=0, decay_mult=0),
-              dict(lr_mult=0, decay_mult=0),
-              dict(lr_mult=0, decay_mult=0)],
-          'eps': eps,
-          'use_global_stats': use_global_stats,
-          }
-      # not updating scale/bias parameters
-      bn_lr_mult = 0
     # parameters for scale bias layer after batchnorm.
     if use_scale:
       sb_kwargs = {
           'bias_term': True,
-          'param': [
-              dict(lr_mult=bn_lr_mult, decay_mult=0),
-              dict(lr_mult=bn_lr_mult, decay_mult=0)],
-          'filler': dict(type='constant', value=1.0),
-          'bias_filler': dict(type='constant', value=0.0),
           }
     else:
       bias_kwargs = {
-          'param': [dict(lr_mult=bn_lr_mult, decay_mult=0)],
+          'param': [dict(lr_mult=lr_mult, decay_mult=0)],
           'filler': dict(type='constant', value=0.0),
           }
   else:
@@ -104,7 +73,7 @@ def ConvBNLayer(net, from_layer, out_layer, use_bn, use_relu, num_output,
     net.update(conv_name, {'dilation': dilation})
   if use_bn:
     bn_name = '{}{}{}'.format(bn_prefix, out_layer, bn_postfix)
-    net[bn_name] = L.BatchNorm(net[conv_name], in_place=True, **bn_kwargs)
+    net[bn_name] = L.BatchNorm(net[conv_name], in_place=True)
     if use_scale:
       sb_name = '{}{}{}'.format(scale_prefix, out_layer, scale_postfix)
       net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
@@ -114,6 +83,58 @@ def ConvBNLayer(net, from_layer, out_layer, use_bn, use_relu, num_output,
   if use_relu:
     relu_name = '{}_relu'.format(conv_name)
     net[relu_name] = L.ReLU(net[conv_name], in_place=True)
+
+def DeconvBNLayer(net, from_layer, out_layer, use_bn, use_relu, num_output,
+    kernel_size, pad, stride, use_scale=True, lr_mult=1, deconv_prefix='', deconv_postfix='',
+    bn_prefix='', bn_postfix='_bn', scale_prefix='', scale_postfix='_scale', bias_prefix='',
+    bias_postfix='_bias', **bn_params):
+  if use_bn:
+    kwargs = {
+        'param': [dict(lr_mult=lr_mult, decay_mult=1)],
+        'weight_filler': dict(type='gaussian', std=0.01),
+        'bias_term': False,
+        }
+    # parameters for scale bias layer after batchnorm.
+    if use_scale:
+      sb_kwargs = {
+          'bias_term': True,
+          }
+    else:
+      bias_kwargs = {
+          'param': [dict(lr_mult=lr_mult, decay_mult=0)],
+          'filler': dict(type='constant', value=0.0),
+          }
+  else:
+    kwargs = {
+        'param': [
+            dict(lr_mult=lr_mult, decay_mult=1),
+            dict(lr_mult=2 * lr_mult, decay_mult=0)],
+        'weight_filler': dict(type='xavier'),
+        'bias_filler': dict(type='constant', value=0)
+        }
+  deconv_name = '{}{}{}'.format(deconv_prefix, out_layer, deconv_postfix)
+  net[deconv_name] = L.Deconvolution(net[from_layer], num_output=num_output,
+      kernel_size=kernel_size, pad=pad, stride=stride, **kwargs)
+
+  if use_bn:
+      bn_name = '{}{}{}'.format(bn_prefix, out_layer, bn_postfix)
+      net[bn_name] = L.BatchNorm(net[deconv_name], in_place=True)
+      if use_scale:
+          sb_name = '{}{}{}'.format(scale_prefix, out_layer, scale_postfix)
+          net[sb_name] = L.Scale(net[bn_name], in_place=True, **sb_kwargs)
+      else:
+          bias_name = '{}{}{}'.format(bias_prefix, out_layer, bias_postfix)
+          net[bias_name] = L.Bias(net[bn_name], in_place=True, **bias_kwargs)
+
+  if use_relu:
+      relu_name = '{}_relu'.format(deconv_name)
+      net[relu_name] = L.ReLU(net[deconv_name], in_place=True)
+
+
+def EltwiseLayer(net, from_layer, out_layer):
+  elt_name = out_layer
+  net[elt_name] = L.Eltwise(net[from_layer[0]], net[from_layer[1]])
+
 
 def ResBody(net, from_layer, block_name, out2a, out2b, out2c, stride, use_branch1, dilation=1, **bn_param):
   # ResBody(net, 'pool1', '2a', 64, 64, 256, 1, True)
@@ -793,7 +814,7 @@ def CreateMultiBoxHead(net, data_layer="data", num_classes=[], from_layers=[],
         use_objectness=False, normalizations=[], use_batchnorm=True, lr_mult=1,
         use_scale=True, min_sizes=[], max_sizes=[], prior_variance = [0.1],
         aspect_ratios=[], steps=[], img_height=0, img_width=0, share_location=True,
-        flip=True, clip=True, offset=0.5, inter_layer_depth=[], kernel_size=1, pad=0,
+        flip=True, clip=True, offset=0.5, inter_layer_depth=[], kernel_size=1, pad=0, prefix='',
         conf_postfix='', loc_postfix='', **bn_param):
     assert num_classes, "must provide num_classes"
     assert num_classes > 0, "num_classes must be positive number"
@@ -916,18 +937,231 @@ def CreateMultiBoxHead(net, data_layer="data", num_classes=[], from_layers=[],
 
     # Concatenate priorbox, loc, and conf layers.
     mbox_layers = []
-    name = "mbox_loc"
+    name = '{}{}'.format(prefix, "_loc")
     net[name] = L.Concat(*loc_layers, axis=1)
     mbox_layers.append(net[name])
-    name = "mbox_conf"
+    name = '{}{}'.format(prefix, "_conf")
     net[name] = L.Concat(*conf_layers, axis=1)
     mbox_layers.append(net[name])
-    name = "mbox_priorbox"
+    name = '{}{}'.format(prefix, "_priorbox")
     net[name] = L.Concat(*priorbox_layers, axis=2)
     mbox_layers.append(net[name])
     if use_objectness:
-        name = "mbox_objectness"
+        name = '{}{}'.format(prefix, "_objectness")
         net[name] = L.Concat(*objectness_layers, axis=1)
         mbox_layers.append(net[name])
+
+    return mbox_layers
+
+
+
+def CreateRefineDetHead(net, data_layer="data", num_classes=[], from_layers=[], from_layers2=[],
+        normalizations=[], use_batchnorm=True, lr_mult=1, min_sizes=[], max_sizes=[], prior_variance = [0.1],
+        aspect_ratios=[], steps=[], img_height=0, img_width=0, share_location=True,
+        flip=True, clip=True, offset=0.5, inter_layer_depth=[], kernel_size=1, pad=0,
+        conf_postfix='', loc_postfix='', **bn_param):
+    assert num_classes, "must provide num_classes"
+    assert num_classes > 0, "num_classes must be positive number"
+    if normalizations:
+        assert len(from_layers) == len(normalizations), "from_layers and normalizations should have same length"
+    assert len(from_layers) == len(min_sizes), "from_layers and min_sizes should have same length"
+    if max_sizes:
+        assert len(from_layers) == len(max_sizes), "from_layers and max_sizes should have same length"
+    if aspect_ratios:
+        assert len(from_layers) == len(aspect_ratios), "from_layers and aspect_ratios should have same length"
+    if steps:
+        assert len(from_layers) == len(steps), "from_layers and steps should have same length"
+    net_layers = net.keys()
+    assert data_layer in net_layers, "data_layer is not in net's layers"
+    if inter_layer_depth:
+        assert len(from_layers) == len(inter_layer_depth), "from_layers and inter_layer_depth should have same length"
+
+    prefix = 'arm'
+    num_classes_rpn = 2
+    num = len(from_layers)
+    priorbox_layers = []
+    loc_layers = []
+    conf_layers = []
+    for i in range(0, num):
+        from_layer = from_layers[i]
+
+        # Get the normalize value.
+        if normalizations:
+            if normalizations[i] != -1:
+                norm_name = "{}_norm".format(from_layer)
+                net[norm_name] = L.Normalize(net[from_layer], scale_filler=dict(type="constant", value=normalizations[i]),
+                    across_spatial=False, channel_shared=False)
+                from_layer = norm_name
+
+        # Add intermediate layers.
+        if inter_layer_depth:
+            if inter_layer_depth[i] > 0:
+                inter_name = "{}_inter".format(from_layer)
+                ResBody(net, from_layer, inter_name, out2a=256, out2b=256, out2c=1024, stride=1, use_branch1=True)
+                # ConvBNLayer(net, from_layer, inter_name, use_bn=use_batchnorm, use_relu=True, lr_mult=lr_mult,
+                #       num_output=inter_layer_depth[i], kernel_size=3, pad=1, stride=1, **bn_param)
+                from_layer = "res{}".format(inter_name)
+
+        # Estimate number of priors per location given provided parameters.
+        min_size = min_sizes[i]
+        if type(min_size) is not list:
+            min_size = [min_size]
+        aspect_ratio = []
+        if len(aspect_ratios) > i:
+            aspect_ratio = aspect_ratios[i]
+            if type(aspect_ratio) is not list:
+                aspect_ratio = [aspect_ratio]
+        max_size = []
+        if len(max_sizes) > i:
+            max_size = max_sizes[i]
+            if type(max_size) is not list:
+                max_size = [max_size]
+            if max_size:
+                assert len(max_size) == len(min_size), "max_size and min_size should have same length."
+        if max_size:
+            num_priors_per_location = (2 + len(aspect_ratio)) * len(min_size)
+        else:
+            num_priors_per_location = (1 + len(aspect_ratio)) * len(min_size)
+        if flip:
+            num_priors_per_location += len(aspect_ratio) * len(min_size)
+        step = []
+        if len(steps) > i:
+            step = steps[i]
+
+        # Create location prediction layer.
+        name = "{}_mbox_loc{}".format(from_layer, loc_postfix)
+        num_loc_output = num_priors_per_location * 4
+        if not share_location:
+            num_loc_output *= num_classes_rpn
+        ConvBNLayer(net, from_layer, name, use_bn=use_batchnorm, use_relu=False, lr_mult=lr_mult,
+            num_output=num_loc_output, kernel_size=kernel_size, pad=pad, stride=1, **bn_param)
+        permute_name = "{}_perm".format(name)
+        net[permute_name] = L.Permute(net[name], order=[0, 2, 3, 1])
+        flatten_name = "{}_flat".format(name)
+        net[flatten_name] = L.Flatten(net[permute_name], axis=1)
+        loc_layers.append(net[flatten_name])
+
+        # Create confidence prediction layer.
+        name = "{}_mbox_conf{}".format(from_layer, conf_postfix)
+        num_conf_output = num_priors_per_location * num_classes_rpn
+        ConvBNLayer(net, from_layer, name, use_bn=use_batchnorm, use_relu=False, lr_mult=lr_mult,
+            num_output=num_conf_output, kernel_size=kernel_size, pad=pad, stride=1, **bn_param)
+        permute_name = "{}_perm".format(name)
+        net[permute_name] = L.Permute(net[name], order=[0, 2, 3, 1])
+        flatten_name = "{}_flat".format(name)
+        net[flatten_name] = L.Flatten(net[permute_name], axis=1)
+        conf_layers.append(net[flatten_name])
+
+        # Create prior generation layer.
+        name = "{}_mbox_priorbox".format(from_layer)
+        net[name] = L.PriorBox(net[from_layer], net[data_layer], min_size=min_size,
+                clip=clip, variance=prior_variance, offset=offset)
+        if max_size:
+            net.update(name, {'max_size': max_size})
+        if aspect_ratio:
+            net.update(name, {'aspect_ratio': aspect_ratio, 'flip': flip})
+        if step:
+            net.update(name, {'step': step})
+        if img_height != 0 and img_width != 0:
+            if img_height == img_width:
+                net.update(name, {'img_size': img_height})
+            else:
+                net.update(name, {'img_h': img_height, 'img_w': img_width})
+        priorbox_layers.append(net[name])
+
+    # Concatenate priorbox, loc, and conf layers.
+    mbox_layers = []
+    name = '{}{}'.format(prefix, "_loc")
+    net[name] = L.Concat(*loc_layers, axis=1)
+    mbox_layers.append(net[name])
+    name = '{}{}'.format(prefix, "_conf")
+    net[name] = L.Concat(*conf_layers, axis=1)
+    mbox_layers.append(net[name])
+    name = '{}{}'.format(prefix, "_priorbox")
+    net[name] = L.Concat(*priorbox_layers, axis=2)
+    mbox_layers.append(net[name])
+
+
+
+    prefix = 'odm'
+    num = len(from_layers2)
+    loc_layers = []
+    conf_layers = []
+    for i in range(0, num):
+        from_layer = from_layers2[i]
+
+        # Get the normalize value.
+        if normalizations:
+            if normalizations[i] != -1:
+                norm_name = "{}_norm".format(from_layer)
+                net[norm_name] = L.Normalize(net[from_layer], scale_filler=dict(type="constant", value=normalizations[i]),
+                    across_spatial=False, channel_shared=False)
+                from_layer = norm_name
+
+        # Add intermediate layers.
+        if inter_layer_depth:
+            if inter_layer_depth[i] > 0:
+                inter_name = "{}_inter".format(from_layer)
+                ResBody(net, from_layer, inter_name, out2a=256, out2b=256, out2c=1024, stride=1, use_branch1=True)
+                # ConvBNLayer(net, from_layer, inter_name, use_bn=use_batchnorm, use_relu=True, lr_mult=lr_mult,
+                #       num_output=inter_layer_depth[i], kernel_size=3, pad=1, stride=1, **bn_param)
+                # from_layer = inter_name
+                from_layer = "res{}".format(inter_name)
+
+        # Estimate number of priors per location given provided parameters.
+        min_size = min_sizes[i]
+        if type(min_size) is not list:
+            min_size = [min_size]
+        aspect_ratio = []
+        if len(aspect_ratios) > i:
+            aspect_ratio = aspect_ratios[i]
+            if type(aspect_ratio) is not list:
+                aspect_ratio = [aspect_ratio]
+        max_size = []
+        if len(max_sizes) > i:
+            max_size = max_sizes[i]
+            if type(max_size) is not list:
+                max_size = [max_size]
+            if max_size:
+                assert len(max_size) == len(min_size), "max_size and min_size should have same length."
+        if max_size:
+            num_priors_per_location = (2 + len(aspect_ratio)) * len(min_size)
+        else:
+            num_priors_per_location = (1 + len(aspect_ratio)) * len(min_size)
+        if flip:
+            num_priors_per_location += len(aspect_ratio) * len(min_size)
+
+        # Create location prediction layer.
+        name = "{}_mbox_loc{}".format(from_layer, loc_postfix)
+        num_loc_output = num_priors_per_location * 4
+        if not share_location:
+            num_loc_output *= num_classes
+        ConvBNLayer(net, from_layer, name, use_bn=use_batchnorm, use_relu=False, lr_mult=lr_mult,
+                    num_output=num_loc_output, kernel_size=kernel_size, pad=pad, stride=1, **bn_param)
+        permute_name = "{}_perm".format(name)
+        net[permute_name] = L.Permute(net[name], order=[0, 2, 3, 1])
+        flatten_name = "{}_flat".format(name)
+        net[flatten_name] = L.Flatten(net[permute_name], axis=1)
+        loc_layers.append(net[flatten_name])
+
+        # Create confidence prediction layer.
+        name = "{}_mbox_conf{}".format(from_layer, conf_postfix)
+        num_conf_output = num_priors_per_location * num_classes
+        ConvBNLayer(net, from_layer, name, use_bn=use_batchnorm, use_relu=False, lr_mult=lr_mult,
+                    num_output=num_conf_output, kernel_size=kernel_size, pad=pad, stride=1, **bn_param)
+        permute_name = "{}_perm".format(name)
+        net[permute_name] = L.Permute(net[name], order=[0, 2, 3, 1])
+        flatten_name = "{}_flat".format(name)
+        net[flatten_name] = L.Flatten(net[permute_name], axis=1)
+        conf_layers.append(net[flatten_name])
+
+
+    # Concatenate priorbox, loc, and conf layers.
+    name = '{}{}'.format(prefix, "_loc")
+    net[name] = L.Concat(*loc_layers, axis=1)
+    mbox_layers.append(net[name])
+    name = '{}{}'.format(prefix, "_conf")
+    net[name] = L.Concat(*conf_layers, axis=1)
+    mbox_layers.append(net[name])
 
     return mbox_layers
