@@ -79,14 +79,19 @@ def get_field_indices(x_axis_field, y_axis_field):
 
 def load_data(data_file, field_idx0, field_idx1):
     data = [[], []]
+    print '{} {} {} '.format(data_file, field_idx0, field_idx1)
     with open(data_file, 'r') as f:
         for line in f:
             line = line.strip()
             if line[0] != '#':
                 fields = line.split()
-                if len(fields) > field_idx0 and len(fields) > field_idx1:
-                    data[0].append(float(fields[field_idx0].strip()))
-                    data[1].append(float(fields[field_idx1].strip()))
+                if len(fields) <= field_idx1 or len(fields) <= field_idx0 :
+                    print 'len: {} and fields {}'.format(len(fields), fields)
+                    continue
+
+                #print 'len: {} fields {}, idx0 {}, idx1 {}'.format(len(fields), fields,field_idx0, field_idx1)
+                data[0].append(float(fields[field_idx0].strip()))
+                data[1].append(float(fields[field_idx1].strip()))
     return data
 
 def random_marker():

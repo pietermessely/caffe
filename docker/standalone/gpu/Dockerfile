@@ -1,8 +1,5 @@
-FROM nvidia/cuda:10.2-cudnn7-devel-ubuntu18.04
-
+FROM nvidia/cuda:7.5-cudnn5-devel-ubuntu14.04
 MAINTAINER caffe-maint@googlegroups.com
-
-ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
@@ -10,8 +7,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         git \
         wget \
         libatlas-base-dev \
-	libopenblas-dev \
-	libatlas-base-dev \
         libboost-all-dev \
         libgflags-dev \
         libgoogle-glog-dev \
@@ -25,8 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         python-dev \
         python-numpy \
         python-pip \
-        python-scipy \
-	python-skimage && \
+        python-scipy && \
     rm -rf /var/lib/apt/lists/*
 
 ENV CAFFE_ROOT=/opt/caffe
@@ -35,13 +29,12 @@ WORKDIR $CAFFE_ROOT
 # FIXME: clone a specific git tag and use ARG instead of ENV once DockerHub supports this.
 ENV CLONE_TAG=master
 
-RUN git clone -b ssd --depth 1 https://github.com/pietermessely/caffe.git . && \
-    for req in $(cat python/requirements.txt) pydot; do pip install $req; done 
+RUN git clone -b ${CLONE_TAG} --depth 1 https://github.com/BVLC/caffe.git . && \
+    for req in $(cat python/requirements.txt) pydot; do pip install $req; done && \
+    mkdir build && cd build && \
+    cmake -DUSE_CUDNN=1 .. && \
+    make -j"$(nproc)"
 
-COPY Makefile.config Makefile.config
-
-RUN make all 
-RUN make pycaffe
 ENV PYCAFFE_ROOT $CAFFE_ROOT/python
 ENV PYTHONPATH $PYCAFFE_ROOT:$PYTHONPATH
 ENV PATH $CAFFE_ROOT/build/tools:$PYCAFFE_ROOT:$PATH

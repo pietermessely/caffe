@@ -9,6 +9,7 @@
 #  GLOG_LIBRARIES
 #  GLOG_LIBRARYRARY_DIRS
 
+message(STATUS "Using FindGlog.cmake --this is bad")
 include(FindPackageHandleStandardArgs)
 
 set(GLOG_ROOT_DIR "" CACHE PATH "Folder contains Google glog")

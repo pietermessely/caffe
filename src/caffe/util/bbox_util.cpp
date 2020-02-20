@@ -1226,8 +1226,10 @@ void GetGroundTruth(const Dtype* gt_data, const int num_gt,
     if (num_classes_ == 2 && label >= 2){
       label = 1;
     }
-    CHECK_NE(background_label_id, label)
-        << "Found background label in the dataset.";
+
+//    CHECK_NE(background_label_id, label)
+  //      << "Found background label in the dataset.";
+
     bool difficult = static_cast<bool>(gt_data[start_idx + 7]);
     if (!use_difficult_gt && difficult) {
       // Skip reading difficult ground truth.
@@ -1270,8 +1272,8 @@ void GetGroundTruth(const Dtype* gt_data, const int num_gt,
     if (num_classes_ == 2 && label >= 2){
       label = 1;
     }
-    CHECK_NE(background_label_id, label)
-        << "Found background label in the dataset.";
+    //CHECK_NE(background_label_id, label)
+      //  << "Found background label in the dataset.";
     bool difficult = static_cast<bool>(gt_data[start_idx + 7]);
     if (!use_difficult_gt && difficult) {
       // Skip reading difficult ground truth.
@@ -1727,7 +1729,7 @@ void ComputeConfLoss(const Dtype* conf_data, const int num,
       int start_idx = p * num_classes;
       int label = background_label_id;
       Dtype loss = 0;
-      if (loss_type == MultiBoxLossParameter_ConfLossType_SOFTMAX) {
+      if (loss_type == MultiBoxLossParameter_ConfLossType_SOFTMAX  || loss_type == MultiBoxLossParameter_ConfLossType_SOFTMAX_FOCAL_LOSS) {
         CHECK_GE(label, 0);
         CHECK_LT(label, num_classes);
         // Compute softmax probability.
@@ -1742,7 +1744,7 @@ void ComputeConfLoss(const Dtype* conf_data, const int num,
         }
         Dtype prob = std::exp(conf_data[start_idx + label] - maxval) / sum;
         loss = -log(std::max(prob, Dtype(FLT_MIN)));
-      } else if (loss_type == MultiBoxLossParameter_ConfLossType_LOGISTIC) {
+      } else if (loss_type == MultiBoxLossParameter_ConfLossType_LOGISTIC  || loss_type == MultiBoxLossParameter_ConfLossType_LOGISTIC_FOCAL_LOSS) {
         int target = 0;
         for (int c = 0; c < num_classes; ++c) {
           if (c == label) {
@@ -1809,7 +1811,7 @@ void ComputeConfLoss(const Dtype* conf_data, const int num,
         }
       }
       Dtype loss = 0;
-      if (loss_type == MultiBoxLossParameter_ConfLossType_SOFTMAX) {
+      if (loss_type == MultiBoxLossParameter_ConfLossType_SOFTMAX  || loss_type == MultiBoxLossParameter_ConfLossType_SOFTMAX_FOCAL_LOSS) {
         CHECK_GE(label, 0);
         CHECK_LT(label, num_classes);
         // Compute softmax probability.
@@ -1824,7 +1826,7 @@ void ComputeConfLoss(const Dtype* conf_data, const int num,
         }
         Dtype prob = std::exp(conf_data[start_idx + label] - maxval) / sum;
         loss = -log(std::max(prob, Dtype(FLT_MIN)));
-      } else if (loss_type == MultiBoxLossParameter_ConfLossType_LOGISTIC) {
+      } else if (loss_type == MultiBoxLossParameter_ConfLossType_LOGISTIC  || loss_type == MultiBoxLossParameter_ConfLossType_LOGISTIC_FOCAL_LOSS) {
         int target = 0;
         for (int c = 0; c < num_classes; ++c) {
           if (c == label) {
@@ -1912,9 +1914,11 @@ void EncodeConfPrediction(const Dtype* conf_data, const int num,
           int idx = do_neg_mining ? count : j;
           switch (conf_loss_type) {
             case MultiBoxLossParameter_ConfLossType_SOFTMAX:
+            case MultiBoxLossParameter_ConfLossType_SOFTMAX_FOCAL_LOSS:
               conf_gt_data[idx] = gt_label;
               break;
             case MultiBoxLossParameter_ConfLossType_LOGISTIC:
+            case MultiBoxLossParameter_ConfLossType_LOGISTIC_FOCAL_LOSS:
               conf_gt_data[idx * num_classes + gt_label] = 1;
               break;
             default:
@@ -1938,9 +1942,11 @@ void EncodeConfPrediction(const Dtype* conf_data, const int num,
               conf_pred_data + count * num_classes);
           switch (conf_loss_type) {
             case MultiBoxLossParameter_ConfLossType_SOFTMAX:
+            case MultiBoxLossParameter_ConfLossType_SOFTMAX_FOCAL_LOSS:
               conf_gt_data[count] = background_label_id;
               break;
             case MultiBoxLossParameter_ConfLossType_LOGISTIC:
+            case MultiBoxLossParameter_ConfLossType_LOGISTIC_FOCAL_LOSS:
               if (background_label_id >= 0 &&
                   background_label_id < num_classes) {
                 conf_gt_data[count * num_classes + background_label_id] = 1;
@@ -2507,7 +2513,7 @@ void VisualizeBBox(const vector<cv::Mat>& images, const Blob<Dtype>* detections,
                                     &baseline);
     cv::rectangle(image, cv::Point(0, 0),
                   cv::Point(text.width, text.height + baseline),
-                  CV_RGB(255, 255, 255), CV_FILLED);
+                  CV_RGB(255, 255, 255), cv::FILLED);
     cv::putText(image, buffer, cv::Point(0, text.height + baseline / 2.),
                 fontface, scale, CV_RGB(0, 0, 0), thickness, 8);
     // Draw bboxes.
@@ -2533,7 +2539,7 @@ void VisualizeBBox(const vector<cv::Mat>& images, const Blob<Dtype>* detections,
         cv::rectangle(
             image, bottom_left_pt + cv::Point(0, 0),
             bottom_left_pt + cv::Point(text.width, -text.height-baseline),
-            color, CV_FILLED);
+            color, cv::FILLED);
         cv::putText(image, buffer, bottom_left_pt - cv::Point(0, baseline),
                     fontface, scale, CV_RGB(0, 0, 0), thickness, 8);
       }
@@ -2542,7 +2548,7 @@ void VisualizeBBox(const vector<cv::Mat>& images, const Blob<Dtype>* detections,
     if (!save_file.empty()) {
       if (!cap_out.isOpened()) {
         cv::Size size(image.size().width, image.size().height);
-        cv::VideoWriter outputVideo(save_file, CV_FOURCC('D', 'I', 'V', 'X'),
+        cv::VideoWriter outputVideo(save_file, cv::VideoWriter::fourcc('D', 'I', 'V', 'X'),
             30, size, true);
         cap_out = outputVideo;
       }

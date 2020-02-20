@@ -1,12 +1,16 @@
 # glog depends on gflags
 include("cmake/External/gflags.cmake")
-
 if (NOT __GLOG_INCLUDED)
   set(__GLOG_INCLUDED TRUE)
 
   # try the system-wide glog first
-  find_package(Glog)
+  if (WIN32)
+    find_package(glog CONFIG NO_MODULE)
+  else()
+    find_package(Glog)
+  endif()
   if (GLOG_FOUND)
+	  message(STATUS "Found glog")
       set(GLOG_EXTERNAL FALSE)
   else()
     # fetch and build glog from github

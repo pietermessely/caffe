@@ -111,11 +111,47 @@ void MultiBoxLossLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
     conf_pred_.Reshape(conf_shape);
     conf_loss_layer_ = LayerRegistry<Dtype>::CreateLayer(layer_param);
     conf_loss_layer_->SetUp(conf_bottom_vec_, conf_top_vec_);
+  } else if (conf_loss_type_ == MultiBoxLossParameter_ConfLossType_SOFTMAX_FOCAL_LOSS) {
+    CHECK_GE(background_label_id_, 0)
+        << "background_label_id should be within [0, num_classes) for Softmax.";
+    CHECK_LT(background_label_id_, num_classes_)
+        << "background_label_id should be within [0, num_classes) for Softmax.";
+    LayerParameter layer_param;
+    layer_param.set_name(this->layer_param_.name() + "_softmax_focal_loss_conf");
+    layer_param.set_type("SoftmaxWithFocalLoss");
+    layer_param.add_loss_weight(Dtype(1.));
+    layer_param.mutable_loss_param()->set_normalization(
+        LossParameter_NormalizationMode_NONE);
+    SoftmaxParameter* softmax_param = layer_param.mutable_softmax_param();
+    softmax_param->set_axis(1);
+    FocalLossParameter* focal_loss_param = layer_param.mutable_focal_loss_param();
+    focal_loss_param->set_gamma(multibox_loss_param.focal_loss_gamma());
+    // Fake reshape.
+    vector<int> conf_shape(1, 1);
+    conf_gt_.Reshape(conf_shape);
+    conf_shape.push_back(num_classes_);
+    conf_pred_.Reshape(conf_shape);
+    conf_loss_layer_ = LayerRegistry<Dtype>::CreateLayer(layer_param);
+    conf_loss_layer_->SetUp(conf_bottom_vec_, conf_top_vec_);
   } else if (conf_loss_type_ == MultiBoxLossParameter_ConfLossType_LOGISTIC) {
     LayerParameter layer_param;
     layer_param.set_name(this->layer_param_.name() + "_logistic_conf");
     layer_param.set_type("SigmoidCrossEntropyLoss");
     layer_param.add_loss_weight(Dtype(1.));
+    // Fake reshape.
+    vector<int> conf_shape(1, 1);
+    conf_shape.push_back(num_classes_);
+    conf_gt_.Reshape(conf_shape);
+    conf_pred_.Reshape(conf_shape);
+    conf_loss_layer_ = LayerRegistry<Dtype>::CreateLayer(layer_param);
+    conf_loss_layer_->SetUp(conf_bottom_vec_, conf_top_vec_);
+  } else if (conf_loss_type_ == MultiBoxLossParameter_ConfLossType_LOGISTIC_FOCAL_LOSS) {
+    LayerParameter layer_param;
+    layer_param.set_name(this->layer_param_.name() + "_logistic_conf");
+    layer_param.set_type("SigmoidCrossEntropyFocalLoss");
+    layer_param.add_loss_weight(Dtype(1.));
+    FocalLossParameter* focal_loss_param = layer_param.mutable_focal_loss_param();
+    focal_loss_param->set_gamma(multibox_loss_param.focal_loss_gamma());
     // Fake reshape.
     vector<int> conf_shape(1, 1);
     conf_shape.push_back(num_classes_);
@@ -149,13 +185,13 @@ void MultiBoxLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   const Dtype* conf_data = bottom[1]->cpu_data();
   const Dtype* prior_data = bottom[2]->cpu_data();
   const Dtype* gt_data = bottom[3]->cpu_data();
-  const Dtype* arm_conf_data = NULL;
-  const Dtype* arm_loc_data = NULL;
-  vector<LabelBBox> all_arm_loc_preds;
-  if (bottom.size() >= 5) {
+  const Dtype* arm_conf_data = NULL;            // (km) merged from refinedet
+  const Dtype* arm_loc_data = NULL;             // (km) merged from refinedet
+  vector<LabelBBox> all_arm_loc_preds;          // (km) merged from refinedet
+  if (bottom.size() >= 5) {             // (km) merged from refinedet
 	arm_conf_data = bottom[4]->cpu_data();
   }
-  if (bottom.size() >= 6) {
+  if (bottom.size() >= 6) {             // (km) merged from refinedet
 	arm_loc_data = bottom[5]->cpu_data();
 	GetLocPredictions(arm_loc_data, num_, num_priors_, loc_classes_, share_location_,
 	                  &all_arm_loc_preds);
@@ -164,7 +200,7 @@ void MultiBoxLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   // Retrieve all ground truth.
   map<int, vector<NormalizedBBox> > all_gt_bboxes;
   GetGroundTruth(gt_data, num_gt_, background_label_id_, use_difficult_gt_, num_classes_,
-                 &all_gt_bboxes);
+                 &all_gt_bboxes);       // (km) merged from refinedet
 
   // Retrieve all prior bboxes. It is same within a batch since we assume all
   // images in a batch are of same dimension.
@@ -179,7 +215,7 @@ void MultiBoxLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
 
   // Find matches between source bboxes and ground truth bboxes.
   vector<map<int, vector<float> > > all_match_overlaps;
-  if (bottom.size() >= 6) {
+  if (bottom.size() >= 6) {     // (km) merged from refinedet
 	CasRegFindMatches(all_loc_preds, all_gt_bboxes, prior_bboxes, prior_variances,
 			    multibox_loss_param_, &all_match_overlaps, &all_match_indices_, all_arm_loc_preds);
   }
@@ -194,7 +230,7 @@ void MultiBoxLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   MineHardExamples(*bottom[1], all_loc_preds, all_gt_bboxes, prior_bboxes,
                    prior_variances, all_match_overlaps, multibox_loss_param_,
                    &num_matches_, &num_negs, &all_match_indices_,
-                   &all_neg_indices_, arm_conf_data);
+                   &all_neg_indices_, arm_conf_data);   // (km) merged from refinedet
 
   if (num_matches_ >= 1) {
     // Form data to pass on to loc_loss_layer_.
@@ -205,7 +241,7 @@ void MultiBoxLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
     loc_gt_.Reshape(loc_shape);
     Dtype* loc_pred_data = loc_pred_.mutable_cpu_data();
     Dtype* loc_gt_data = loc_gt_.mutable_cpu_data();
-    if (bottom.size() >= 6) {
+    if (bottom.size() >= 6) {   // (km) merged from refinedet
 	  CasRegEncodeLocPrediction(all_loc_preds, all_gt_bboxes, all_match_indices_,
 	  					prior_bboxes, prior_variances, multibox_loss_param_,
 	  					loc_pred_data, loc_gt_data, all_arm_loc_preds);
@@ -230,12 +266,12 @@ void MultiBoxLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom,
   if (num_conf_ >= 1) {
     // Reshape the confidence data.
     vector<int> conf_shape;
-    if (conf_loss_type_ == MultiBoxLossParameter_ConfLossType_SOFTMAX) {
+    if (conf_loss_type_ == MultiBoxLossParameter_ConfLossType_SOFTMAX  || conf_loss_type_ ==  MultiBoxLossParameter_ConfLossType_SOFTMAX_FOCAL_LOSS) {
       conf_shape.push_back(num_conf_);
       conf_gt_.Reshape(conf_shape);
       conf_shape.push_back(num_classes_);
       conf_pred_.Reshape(conf_shape);
-    } else if (conf_loss_type_ == MultiBoxLossParameter_ConfLossType_LOGISTIC) {
+    } else if (conf_loss_type_ == MultiBoxLossParameter_ConfLossType_LOGISTIC  || conf_loss_type_ == MultiBoxLossParameter_ConfLossType_LOGISTIC_FOCAL_LOSS) {
       conf_shape.push_back(1);
       conf_shape.push_back(num_conf_);
       conf_shape.push_back(num_classes_);

@@ -731,11 +731,11 @@ __global__ void ComputeConfLossKernel(const int nthreads,
     int p = index % num_preds_per_class;
     int start_idx = (num * num_preds_per_class + p) * num_classes;
     Dtype loss = 0;
-    if (loss_type == MultiBoxLossParameter_ConfLossType_SOFTMAX) {
+    if (loss_type == MultiBoxLossParameter_ConfLossType_SOFTMAX  || loss_type == MultiBoxLossParameter_ConfLossType_SOFTMAX_FOCAL_LOSS) {
       // Compute softmax probability.
       Dtype prob = conf_data[start_idx + label];
       loss = -log(Max(prob, Dtype(FLT_MIN)));
-    } else if (loss_type == MultiBoxLossParameter_ConfLossType_LOGISTIC) {
+    } else if (loss_type == MultiBoxLossParameter_ConfLossType_LOGISTIC  || loss_type == MultiBoxLossParameter_ConfLossType_LOGISTIC_FOCAL_LOSS) {
       int target = 0;
       for (int c = 0; c < num_classes; ++c) {
         if (c == label) {
@@ -778,7 +778,7 @@ void ComputeConfLossGPU(const Blob<Dtype>& conf_blob, const int num,
           CHECK_LT(match_index[p], gt_bboxes.size());
           label = gt_bboxes[match_index[p]].label();
           CHECK_GE(label, 0);
-          CHECK_NE(label, background_label_id);
+         // CHECK_NE(label, background_label_id);
           CHECK_LT(label, num_classes);
           // A prior can only be matched to one gt bbox.
           break;
@@ -791,7 +791,7 @@ void ComputeConfLossGPU(const Blob<Dtype>& conf_blob, const int num,
   const Dtype* conf_gpu_data = conf_blob.gpu_data();
   Blob<Dtype> prob_blob;
   prob_blob.ReshapeLike(conf_blob);
-  if (loss_type == MultiBoxLossParameter_ConfLossType_SOFTMAX) {
+  if (loss_type == MultiBoxLossParameter_ConfLossType_SOFTMAX  || loss_type == MultiBoxLossParameter_ConfLossType_SOFTMAX_FOCAL_LOSS) {
     Dtype* prob_gpu_data = prob_blob.mutable_gpu_data();
     SoftMaxGPU(conf_blob.gpu_data(), num * num_preds_per_class, num_classes, 1,
         prob_gpu_data);

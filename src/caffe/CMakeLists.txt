@@ -1,3 +1,8 @@
+if(WIN32)
+	#message(STATUS "adding lean and mean def")
+	add_definitions(-DWIN32_LEAN_AND_MEAN)
+endif()
+
 # generate protobuf sources
 file(GLOB proto_files proto/*.proto)
 caffe_protobuf_generate_cpp_py(${proto_gen_folder} proto_srcs proto_hdrs proto_python ${proto_files})
@@ -17,7 +22,11 @@ if(HAVE_CUDA)
   list(APPEND srcs ${cuda_objs} ${cuda})
 endif()
 
-add_library(caffe ${srcs})
+if(WIN32)
+	add_library(caffe STATIC ${srcs})
+else()
+	add_library(caffe ${srcs})
+endif()
 target_link_libraries(caffe proto ${Caffe_LINKER_LIBS})
 caffe_default_properties(caffe)
 set_target_properties(caffe PROPERTIES

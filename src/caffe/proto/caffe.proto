@@ -437,7 +437,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 147 (last added: recurrent_param)
+// LayerParameter next available layer-specific ID: 148 (last added: focal_loss)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -508,6 +508,7 @@ message LayerParameter {
   optional EmbedParameter embed_param = 137;
   optional ExpParameter exp_param = 111;
   optional FlattenParameter flatten_param = 135;
+  optional FocalLossParameter focal_loss_param = 147;
   optional HDF5DataParameter hdf5_data_param = 112;
   optional HDF5OutputParameter hdf5_output_param = 113;
   optional HingeLossParameter hinge_loss_param = 114;
@@ -1106,6 +1107,10 @@ message ExpParameter {
   optional float scale = 2 [default = 1.0];
   optional float shift = 3 [default = 0.0];
 }
+// Message that stores parameters used by SoftmaxWithFocalLossLayer and SigmoidCrossEntropyLossLayer
+message FocalLossParameter {
+  optional float gamma = 1 [default = 2.0];
+}
 
 /// Message that stores parameters used by FlattenLayer
 message FlattenParameter {
@@ -1256,6 +1261,8 @@ message MultiBoxLossParameter {
   enum ConfLossType {
     SOFTMAX = 0;
     LOGISTIC = 1;
+    SOFTMAX_FOCAL_LOSS = 2;
+    LOGISTIC_FOCAL_LOSS = 3;
   }
   optional ConfLossType conf_loss_type = 2 [default = SOFTMAX];
   // Weight for localization loss.
@@ -1315,8 +1322,10 @@ message MultiBoxLossParameter {
   optional int32 sample_size = 22 [default = 64];
   optional bool use_prior_for_nms = 23 [default = false];
 
+  optional float focal_loss_gamma = 24 [default = 2.0];
+
   //the objectness score is used for the anchor refinement module to filter easy negative anchor.
-  optional float objectness_score = 24 [default = 0.01];
+  optional float objectness_score = 25 [default = 0.01];
 }
 
 message MVNParameter {

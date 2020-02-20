@@ -7,7 +7,11 @@ foreach(source ${srcs})
 
   # caffe target already exits
   if(name MATCHES "caffe")
-    set(name ${name}.bin)
+    if (WIN32)
+      set(name ${name}exe)
+    else()
+      set(name ${name}.bin)
+    endif()
   endif()
 
   # target

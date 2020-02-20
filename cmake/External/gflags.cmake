@@ -1,9 +1,13 @@
 if (NOT __GFLAGS_INCLUDED) # guard against multiple includes
   set(__GFLAGS_INCLUDED TRUE)
-
   # use the system-wide gflags if present
-  find_package(GFlags)
+  if (WIN32)
+    find_package(gflags CONFIG NO_MODULE)
+  else()
+    find_package(GFlags)
+  endif()
   if (GFLAGS_FOUND)
+	message(STATUS "Found gflags")
     set(GFLAGS_EXTERNAL FALSE)
   else()
     # gflags will use pthreads if it's available in the system, so we must link with it

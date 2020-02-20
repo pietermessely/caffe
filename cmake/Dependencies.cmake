@@ -2,7 +2,11 @@
 set(Caffe_LINKER_LIBS "")
 
 # ---[ Boost
-find_package(Boost 1.46 REQUIRED COMPONENTS system thread filesystem regex)
+if (WIN32)
+  find_package(Boost 1.61 REQUIRED COMPONENTS system thread filesystem regex)
+else()
+  find_package(Boost 1.46 REQUIRED COMPONENTS system thread filesystem regex)
+endif()
 include_directories(SYSTEM ${Boost_INCLUDE_DIR})
 list(APPEND Caffe_LINKER_LIBS ${Boost_LIBRARIES})
 
@@ -10,27 +14,55 @@ list(APPEND Caffe_LINKER_LIBS ${Boost_LIBRARIES})
 find_package(Threads REQUIRED)
 list(APPEND Caffe_LINKER_LIBS ${CMAKE_THREAD_LIBS_INIT})
 
-# ---[ Google-glog
-include("cmake/External/glog.cmake")
-include_directories(SYSTEM ${GLOG_INCLUDE_DIRS})
-list(APPEND Caffe_LINKER_LIBS ${GLOG_LIBRARIES})
+# glog first
+if (NOT WIN32)
+  include("cmake/External/glog.cmake")
+  include_directories(SYSTEM ${GLOG_INCLUDE_DIRS})
+  list(APPEND Caffe_LINKER_LIBS ${GLOG_LIBRARIES})
+endif()
 
 # ---[ Google-gflags
-include("cmake/External/gflags.cmake")
+if (WIN32)
+  find_package(gflags REQUIRED CONFIG NO_MODULE)
+else()
+  include("cmake/External/gflags.cmake")
+endif()
 include_directories(SYSTEM ${GFLAGS_INCLUDE_DIRS})
 list(APPEND Caffe_LINKER_LIBS ${GFLAGS_LIBRARIES})
+
+# ---[ Google-glog
+if (WIN32)
+  find_package(glog REQUIRED CONFIG NO_MODULE)
+  include_directories(SYSTEM ${glog_INCLUDE_DIRS})
+  list(APPEND Caffe_LINKER_LIBS ${glog_LIBRARIES})
+endif()
 
 # ---[ Google-protobuf
 include(cmake/ProtoBuf.cmake)
 
 # ---[ HDF5
-find_package(HDF5 COMPONENTS HL REQUIRED)
-include_directories(SYSTEM ${HDF5_INCLUDE_DIRS} ${HDF5_HL_INCLUDE_DIR})
-list(APPEND Caffe_LINKER_LIBS ${HDF5_LIBRARIES} ${HDF5_HL_LIBRARIES})
+if (WIN32)
+  find_package(HDF5 COMPONENTS HL static REQUIRED NO_MODULE)
+  include_directories(SYSTEM ${HDF5_INCLUDE_DIR} ${HDF5_INCLUDE_DIR_HL})
+  if(HDF5_FOUND)
+    message(STATUS "Found HDF5")
+  endif()
+  # ${HDF5_STATIC_LIBRARY}
+  message(STATUS "hdf5 libs: ${HDF5_STATIC_LIBRARY} hdf5_hl libs: ${HDF5_HL_STATIC_LIBRARY}")
+  list(APPEND Caffe_LINKER_LIBS ${HDF5_HL_STATIC_LIBRARY})
+else()
+  find_package(HDF5 COMPONENTS HL REQUIRED)
+  include_directories(SYSTEM ${HDF5_INCLUDE_DIRS} ${HDF5_HL_INCLUDE_DIR})
+  list(APPEND Caffe_LINKER_LIBS ${HDF5_LIBRARIES} ${HDF5_HL_LIBRARIES})
+endif()
 
 # ---[ LMDB
 if(USE_LMDB)
-  find_package(LMDB REQUIRED)
+  if (WIN32)
+    find_package(LMDB REQUIRED CONFIG NO_MODULE)
+  else()
+    find_package(LMDB REQUIRED)
+  endif()
   include_directories(SYSTEM ${LMDB_INCLUDE_DIR})
   list(APPEND Caffe_LINKER_LIBS ${LMDB_LIBRARIES})
   add_definitions(-DUSE_LMDB)
@@ -41,17 +73,32 @@ endif()
 
 # ---[ LevelDB
 if(USE_LEVELDB)
-  find_package(LevelDB REQUIRED)
-  include_directories(SYSTEM ${LevelDB_INCLUDE})
-  list(APPEND Caffe_LINKER_LIBS ${LevelDB_LIBRARIES})
+  if (WIN32)
+    find_package(LEVELDB REQUIRED CONFIG NO_MODULE)
+    include_directories(SYSTEM ${LEVELDB_INCLUDE})
+    list(APPEND Caffe_LINKER_LIBS ${LEVELDB_LIBRARIES})
+    if(LEVELDB_FOUND)
+      message(STATUS "Found LevelDB")
+    endif()
+  else()
+    find_package(LevelDB REQUIRED)
+    include_directories(SYSTEM ${LevelDB_INCLUDE})
+    list(APPEND Caffe_LINKER_LIBS ${LevelDB_LIBRARIES})
+  endif()
   add_definitions(-DUSE_LEVELDB)
 endif()
 
 # ---[ Snappy
 if(USE_LEVELDB)
-  find_package(Snappy REQUIRED)
-  include_directories(SYSTEM ${Snappy_INCLUDE_DIR})
-  list(APPEND Caffe_LINKER_LIBS ${Snappy_LIBRARIES})
+  if (WIN32)
+    find_package(SNAPPY REQUIRED CONFIG NO_MODULE)
+    include_directories(SYSTEM ${SNAPPY_INCLUDE_DIR})
+    list(APPEND Caffe_LINKER_LIBS ${SNAPPY_LIBRARIES})
+  else()
+    find_package(Snappy REQUIRED)
+    include_directories(SYSTEM ${Snappy_INCLUDE_DIR})
+    list(APPEND Caffe_LINKER_LIBS ${Snappy_LIBRARIES})
+  endif()
 endif()
 
 # ---[ CUDA
@@ -67,8 +114,31 @@ if(NOT HAVE_CUDA)
   add_definitions(-DCPU_ONLY)
 endif()
 
+#Determine Architecture
+if (WIN32)
+  set(ARCH x86)
+elseif (APPLE)
+  set(ARCH x86)
+elseif (UNIX)
+  execute_process(COMMAND /usr/bin/lscpu OUTPUT_VARIABLE LSCPU)
+  string(FIND "${LSCPU}" "aarch64" matches)
+  if(${matches} EQUAL -1)
+    set(ARCH x86)
+  else()
+    set(ARCH aarch64)
+  endif()
+endif()
+
 # ---[ OpenCV
 if(USE_OPENCV)
+  if (WIN32)
+    set(OpenCV_DIR "$ENV{EXT_PKGS}/dev-setup/build_opencv")
+  elseif (${ARCH} STREQUAL "aarch64")
+    set(OpenCV_DIR "/usr/local/share/OpenCV")
+  else()
+    set(OpenCV_DIR "/usr/local/share")
+  endif()
+
   find_package(OpenCV QUIET COMPONENTS core highgui imgproc imgcodecs videoio)
   if(NOT OpenCV_FOUND) # if not OpenCV 3.x, then imgcodecs are not found
     find_package(OpenCV REQUIRED COMPONENTS core highgui imgproc)
@@ -81,7 +151,11 @@ endif()
 
 # ---[ BLAS
 if(NOT APPLE)
-  set(BLAS "Atlas" CACHE STRING "Selected BLAS library")
+  if (WIN32)
+    set(BLAS "Open" CACHE STRING "Selected BLAS library")
+  else()
+    set(BLAS "Atlas" CACHE STRING "Selected BLAS library")
+  endif()
   set_property(CACHE BLAS PROPERTY STRINGS "Atlas;Open;MKL")
 
   if(BLAS STREQUAL "Atlas" OR BLAS STREQUAL "atlas")
@@ -89,7 +163,11 @@ if(NOT APPLE)
     include_directories(SYSTEM ${Atlas_INCLUDE_DIR})
     list(APPEND Caffe_LINKER_LIBS ${Atlas_LIBRARIES})
   elseif(BLAS STREQUAL "Open" OR BLAS STREQUAL "open")
-    find_package(OpenBLAS REQUIRED)
+    if (WIN32)
+      find_package(OpenBLAS REQUIRED CONFIG NO_MODULE)
+    else()
+      find_package(OpenBLAS REQUIRED)
+    endif()
     include_directories(SYSTEM ${OpenBLAS_INCLUDE_DIR})
     list(APPEND Caffe_LINKER_LIBS ${OpenBLAS_LIB})
   elseif(BLAS STREQUAL "MKL" OR BLAS STREQUAL "mkl")
@@ -111,6 +189,7 @@ elseif(APPLE)
 endif()
 
 # ---[ Python
+message(STATUS "Finding python")
 if(BUILD_python)
   if(NOT "${python_version}" VERSION_LESS "3.0.0")
     # use python3
@@ -119,18 +198,18 @@ if(BUILD_python)
     find_package(NumPy 1.7.1)
     # Find the matching boost python implementation
     set(version ${PYTHONLIBS_VERSION_STRING})
-    
+
     STRING( REGEX REPLACE "[^0-9]" "" boost_py_version ${version} )
     find_package(Boost 1.46 COMPONENTS "python-py${boost_py_version}")
     set(Boost_PYTHON_FOUND ${Boost_PYTHON-PY${boost_py_version}_FOUND})
-    
+
     while(NOT "${version}" STREQUAL "" AND NOT Boost_PYTHON_FOUND)
       STRING( REGEX REPLACE "([0-9.]+).[0-9]+" "\\1" version ${version} )
-      
+
       STRING( REGEX REPLACE "[^0-9]" "" boost_py_version ${version} )
       find_package(Boost 1.46 COMPONENTS "python-py${boost_py_version}")
       set(Boost_PYTHON_FOUND ${Boost_PYTHON-PY${boost_py_version}_FOUND})
-      
+
       STRING( REGEX MATCHALL "([0-9.]+).[0-9]+" has_more_version ${version} )
       if("${has_more_version}" STREQUAL "")
         break()

@@ -1,3 +1,25 @@
+# Flir Fork of Caffe
+```
+# We use the 'ssd' branch of caffe
+# To build caffe and install to /usr/local:
+git checkout ssd
+bash build.sh
+```
+
+# Caffe
+
+# FLIR branch of Single Shot MultiBox Detector
+
+Customized version, including computationally friendly base networks  (InceptionV1, ResNet50), scripts for training and evaluating new data sets, and C++ code to run the detector and draw bounding boxes on still images and videos.
+
+To get started, follow the Installation, Preparation steps below.  
+
+Then take a look at the scripts in examples/ssd/...
+
+examples/ssd/ssd_coco_inception_thermal.py   Starts with a computationally efficient InceptionV1 network, trained on the 80 mscoco object categories, and runs fine tuning iterations using annotated thermal imagery to create a thermal image object detector.
+
+examples/ssd/ssd_detect_FLIR.cpp is built in build/examples/ssd_detect_FLIR.bin and is an executable for running the detector on still images or videos.  
+
 # SSD: Single Shot MultiBox Detector
 
 [![Build Status](https://travis-ci.org/weiliu89/caffe.svg?branch=ssd)](https://travis-ci.org/weiliu89/caffe)
@@ -45,6 +67,7 @@ Please cite SSD in your publications if it helps your research:
 4. [Models](#models)
 
 ### Installation
+#### Ubuntu
 1. Get the code. We will call the directory that you cloned Caffe into `$CAFFE_ROOT`
   ```Shell
   git clone https://github.com/weiliu89/caffe.git
@@ -63,6 +86,24 @@ Please cite SSD in your publications if it helps your research:
   # (Optional)
   make runtest -j8
   ```
+
+#### Windows
+First, complete the installation process for:
+  - dev-setup https://github.com/FLIR/dev-setup
+  - caffe-builder https://github.com/FLIR/caffe-builder
+
+1. Clone the repo
+```
+$ cd C:\ExternalPackages
+$ git clone git@github.com:FLIR/caffe.git
+$ cd caffe
+$ git checkout ssd
+```
+
+2. Run the build script
+```
+$ bash build_windows.sh
+```
 
 ### Preparation
 1. Download [fully convolutional reduced (atrous) VGGNet](https://gist.github.com/weiliu89/2ed6e13bfd5b57cf81d6). By default, we assume the model is stored in `$CAFFE_ROOT/models/VGGNet/`

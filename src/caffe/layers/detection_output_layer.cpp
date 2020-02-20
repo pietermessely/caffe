@@ -10,6 +10,8 @@
 
 #include "caffe/layers/detection_output_layer.hpp"
 
+int visualize_ = 1;
+
 namespace caffe {
 
 template <typename Dtype>
@@ -18,6 +20,7 @@ void DetectionOutputLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   const DetectionOutputParameter& detection_output_param =
       this->layer_param_.detection_output_param();
   CHECK(detection_output_param.has_num_classes()) << "Must specify num_classes";
+  // (km) merged from refinedet
   objectness_score_ = detection_output_param.objectness_score();
   num_classes_ = detection_output_param.num_classes();
   share_location_ = detection_output_param.share_location();
@@ -44,7 +47,7 @@ void DetectionOutputLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
   output_directory_ = save_output_param.output_directory();
   if (!output_directory_.empty()) {
     if (boost::filesystem::is_directory(output_directory_)) {
-      // boost::filesystem::remove_all(output_directory_);
+      // boost::filesystem::remove_all(output_directory_);      // (km) merged from refinedet
     }
     if (!boost::filesystem::create_directories(output_directory_)) {
         LOG(WARNING) << "Failed to create directory: " << output_directory_;
@@ -183,14 +186,14 @@ void DetectionOutputLayer<Dtype>::Forward_cpu(
   const Dtype* loc_data = bottom[0]->cpu_data();
   const Dtype* conf_data = bottom[1]->cpu_data();
   const Dtype* prior_data = bottom[2]->cpu_data();
-  const Dtype* arm_conf_data = NULL;
-  const Dtype* arm_loc_data = NULL;
+  const Dtype* arm_conf_data = NULL;    // (km) merged from refinedet
+  const Dtype* arm_loc_data = NULL;     // (km) merged from refinedet
   const int num = bottom[0]->num();
-  vector<LabelBBox> all_arm_loc_preds;
-  if (bottom.size() >= 4){
+  vector<LabelBBox> all_arm_loc_preds;  // (km) merged from refinedet
+  if (bottom.size() >= 4){      // (km) merged from refinedet
 	arm_conf_data = bottom[3]->cpu_data();
   }
-  if (bottom.size() >= 5){
+  if (bottom.size() >= 5){      // (km) merged from refinedet
   	arm_loc_data = bottom[4]->cpu_data();
 	GetLocPredictions(arm_loc_data, num, num_priors_, num_loc_classes_,
 					share_location_, &all_arm_loc_preds);
@@ -203,6 +206,7 @@ void DetectionOutputLayer<Dtype>::Forward_cpu(
 
   // Retrieve all confidences.
   vector<map<int, vector<float> > > all_conf_scores;
+  // (km) : merged from refinedet
   if (arm_conf_data != NULL) {
 	OSGetConfidenceScores(conf_data, arm_conf_data, num, num_priors_, num_classes_,
 			              &all_conf_scores, objectness_score_);
@@ -221,6 +225,7 @@ void DetectionOutputLayer<Dtype>::Forward_cpu(
   // Decode all loc predictions to bboxes.
   vector<LabelBBox> all_decode_bboxes;
   const bool clip_bbox = false;
+  // (km) merged refinedet
   if (bottom.size() >= 5) {
 	CasRegDecodeBBoxesAll(all_loc_preds, prior_bboxes, prior_variances, num,
 					share_location_, num_loc_classes_, background_label_id_,
@@ -446,6 +451,16 @@ void DetectionOutputLayer<Dtype>::Forward_cpu(
           std::ofstream outfile;
           outfile.open(out_file.string().c_str(), std::ofstream::out);
 
+#ifdef _WIN32
+          //boost::regex exp("\"(null|true|false|-?[0-9]+(\\.[0-9]+)?)\"");
+          ptree output;
+          output.add_child("detections", detections_);
+          std::stringstream ss;
+          write_json(ss, output);
+          //std::string rv = boost::regex_replace(ss.str(), exp, "$1");
+          //outfile << rv.substr(rv.find("["), rv.rfind("]") - rv.find("["))
+          //    << std::endl << "]" << std::endl;
+#else
           boost::regex exp("\"(null|true|false|-?[0-9]+(\\.[0-9]+)?)\"");
           ptree output;
           output.add_child("detections", detections_);
@@ -454,6 +469,7 @@ void DetectionOutputLayer<Dtype>::Forward_cpu(
           std::string rv = boost::regex_replace(ss.str(), exp, "$1");
           outfile << rv.substr(rv.find("["), rv.rfind("]") - rv.find("["))
               << std::endl << "]" << std::endl;
+#endif
         } else if (output_format_ == "ILSVRC") {
           boost::filesystem::path output_directory(output_directory_);
           boost::filesystem::path file(output_name_prefix_ + ".txt");

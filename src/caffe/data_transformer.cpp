@@ -589,6 +589,10 @@ void DataTransformer<Dtype>::Transform(const vector<cv::Mat> & mat_vector,
   }
 }
 
+// (km) Hack: to keep track of saved images
+static int startSave = 0;
+static int numSnapShots = 0;
+
 template<typename Dtype>
 void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
                                        Blob<Dtype>* transformed_blob,
@@ -713,6 +717,23 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
         }
       }
     }
+  }
+
+  // debug hack. Change conditional to enable
+  //if (rand() % 100 < 0 ) {
+  if (rand() % 10000 < 0 ) {
+    startSave=0;
+    numSnapShots += 1;
+  }
+  if (startSave < 50) {
+    startSave += 1;
+    std::ostringstream ostr; //output string stream
+    //ostr << rand() % 10000000000;
+    ostr << (numSnapShots*50 + startSave);
+    
+    //cv::Mat cv_img = DatumToCVMat(sampled_datum->datum());
+    string s = "/mnt/data/caffe_data_augments/" + ostr.str() + ".jpg";
+    cv::imwrite(s.c_str(), cv_cropped_image);
   }
 }
 

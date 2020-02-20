@@ -1,0 +1,1 @@
+./.build_release/examples/ssd/ssd_person_object.bin models/VGGNet/coco_backpack2/SSD_512x512/deploy.prototxt models/VGGNet/coco_backpack2/SSD_512x512/VGG_coco_SSD_512x512_iter_17000.caffemodel videoList.txt
