@@ -13,7 +13,6 @@ from caffe.proto import caffe_pb2
 from google import protobuf
 import re
 import argparse
-import google.protobuf.text_format
 
 # ANSI codes for coloring blobs (used cyclically)
 COLORS = ['92', '93', '94', '95', '97', '96', '42', '43;30', '100',

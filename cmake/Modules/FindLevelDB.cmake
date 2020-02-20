@@ -4,7 +4,6 @@
 #  LevelDB_LIBRARIES - List of libraries when using LevelDB.
 #  LevelDB_FOUND     - True if LevelDB found.
 
-message(STATUS "Using FindLevelDB.cmake :(")
 # Look for the header file.
 find_path(LevelDB_INCLUDE NAMES leveldb/db.h
                           PATHS $ENV{LEVELDB_ROOT}/include /opt/local/include /usr/local/include /usr/include

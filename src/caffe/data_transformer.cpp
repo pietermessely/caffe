@@ -732,7 +732,7 @@ void DataTransformer<Dtype>::Transform(const cv::Mat& cv_img,
     ostr << (numSnapShots*50 + startSave);
     
     //cv::Mat cv_img = DatumToCVMat(sampled_datum->datum());
-    string s = "/mnt/data/caffe_data_augments/" + ostr.str() + ".jpg";
+    string s = "/home/Learning/caffe_data_augments/" + ostr.str() + ".jpg";
     cv::imwrite(s.c_str(), cv_cropped_image);
   }
 }

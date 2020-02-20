@@ -50,15 +50,9 @@
 
 #ifndef GTEST_INCLUDE_GTEST_GTEST_H_
 #define GTEST_INCLUDE_GTEST_GTEST_H_
-#ifdef _WIN32
-#define GTEST_USE_OWN_TR1_TUPLE 0
-#endif
 
 #include <limits>
 #include <vector>
-#ifdef _WIN32
-#include <tuple>
-#endif
 
 // Copyright 2005, Google Inc.
 // All rights reserved.

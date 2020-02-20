@@ -21,9 +21,9 @@ void DetectionOutputLayer<Dtype>::Forward_gpu(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
   const Dtype* loc_data = bottom[0]->gpu_data();
   const Dtype* prior_data = bottom[2]->gpu_data();
-  const Dtype* arm_loc_data = NULL;     // (km) merged from refinedet
+  const Dtype* arm_loc_data = NULL;
   const int num = bottom[0]->num();
-  if (bottom.size() >= 5){      // (km) merged from refinedet
+  if (bottom.size() >= 5){
     arm_loc_data = bottom[4]->gpu_data();
   }
 
@@ -31,7 +31,7 @@ void DetectionOutputLayer<Dtype>::Forward_gpu(
   Dtype* bbox_data = bbox_preds_.mutable_gpu_data();
   const int loc_count = bbox_preds_.count();
   const bool clip_bbox = false;
-  if (bottom.size() >= 5) {     // (km) merged from refinedet
+  if (bottom.size() >= 5) {
     CasRegDecodeBBoxesGPU<Dtype>(loc_count, loc_data, prior_data, code_type_,
         variance_encoded_in_target_, num_priors_, share_location_,
         num_loc_classes_, background_label_id_, clip_bbox, bbox_data, arm_loc_data);
@@ -54,7 +54,7 @@ void DetectionOutputLayer<Dtype>::Forward_gpu(
 
   // Retrieve all confidences.
   Dtype* conf_permute_data = conf_permute_.mutable_gpu_data();
-  if (bottom.size() >= 4) {             // (km) merged from refinedet
+  if (bottom.size() >= 4) {
     OSPermuteDataGPU<Dtype>(bottom[1]->count(), bottom[1]->gpu_data(), bottom[3]->gpu_data(),
         num_classes_, num_priors_, 1, conf_permute_data, objectness_score_);
   }
@@ -269,16 +269,6 @@ void DetectionOutputLayer<Dtype>::Forward_gpu(
           std::ofstream outfile;
           outfile.open(out_file.string().c_str(), std::ofstream::out);
 
-#ifdef _WIN32
-          //boost::regex exp("\"(null|true|false|-?[0-9]+(\\.[0-9]+)?)\"");
-          ptree output;
-          output.add_child("detections", detections_);
-          std::stringstream ss;
-          write_json(ss, output);
-          //std::string rv = boost::regex_replace(ss.str(), exp, "$1");
-          //outfile << rv.substr(rv.find("["), rv.rfind("]") - rv.find("["))
-          //    << std::endl << "]" << std::endl;
-#else
           boost::regex exp("\"(null|true|false|-?[0-9]+(\\.[0-9]+)?)\"");
           ptree output;
           output.add_child("detections", detections_);
@@ -287,7 +277,6 @@ void DetectionOutputLayer<Dtype>::Forward_gpu(
           std::string rv = boost::regex_replace(ss.str(), exp, "$1");
           outfile << rv.substr(rv.find("["), rv.rfind("]") - rv.find("["))
               << std::endl << "]" << std::endl;
-#endif
         } else if (output_format_ == "ILSVRC") {
           boost::filesystem::path output_directory(output_directory_);
           boost::filesystem::path file(output_name_prefix_ + ".txt");

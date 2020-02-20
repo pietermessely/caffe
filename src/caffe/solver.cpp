@@ -515,9 +515,6 @@ void Solver<Dtype>::TestDetection(const int test_net_id) {
     const map<int, int>& num_pos = all_num_pos.find(i)->second;
     map<int, float> APs;
     float mAP = 0.;
-    // (km) : keep track of num labels with no TPs to calc more specific mAP
-    float _mAP = 0.;
-    int numNoTPs = 0;
     // Sort true_pos and false_pos with descend scores.
     for (map<int, int>::const_iterator it = num_pos.begin();
          it != num_pos.end(); ++it) {
@@ -525,7 +522,6 @@ void Solver<Dtype>::TestDetection(const int test_net_id) {
       int label_num_pos = it->second;
       if (true_pos.find(label) == true_pos.end()) {
         LOG(WARNING) << "Missing true_pos for label: " << label;
-        numNoTPs += 1;
         continue;
       }
       const vector<pair<float, int> >& label_true_pos =
@@ -544,18 +540,11 @@ void Solver<Dtype>::TestDetection(const int test_net_id) {
         LOG(INFO) << "class" << label << ": " << APs[label];
       }
     }
-    _mAP = mAP;
     mAP /= num_pos.size();
-    _mAP /= (num_pos.size() - numNoTPs);
     const int output_blob_index = test_net->output_blob_indices()[i];
     const string& output_name = test_net->blob_names()[output_blob_index];
-    LOG(INFO) << "     Test net output #" << i << ": " << output_name << " = " << mAP;
-
-    // (jtm): This used to say '(km) Test net output'. This breaks other scripts that parse the log file. It is also
-    //        not clear or obvious what the difference between the two outputs is. I changed this line to 'HACK net output'
-    //        to (1) reflect that this is a hack and (2) cause it to not break downstream processes and (3) inspire a
-    //        more descriptive message.
-    LOG(INFO) << " (km)HACK net output #" << i << ": " << output_name << " = " << _mAP;
+    LOG(INFO) << "    Test net output #" << i << ": " << output_name << " = "
+              << mAP;
   }
 }
 

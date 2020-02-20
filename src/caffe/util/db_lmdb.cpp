@@ -3,10 +3,6 @@
 
 #include <sys/stat.h>
 
-#ifdef _WIN32
-#include <windows.h>
-#endif
-
 #include <string>
 
 namespace caffe { namespace db {
@@ -14,11 +10,7 @@ namespace caffe { namespace db {
 void LMDB::Open(const string& source, Mode mode) {
   MDB_CHECK(mdb_env_create(&mdb_env_));
   if (mode == NEW) {
-#ifdef _WIN32
-    CHECK_EQ(CreateDirectory(source.c_str(), NULL), 0) << "mkdir " << source << " failed";
-#else
     CHECK_EQ(mkdir(source.c_str(), 0744), 0) << "mkdir " << source << " failed";
-#endif
   }
   int flags = 0;
   if (mode == READ) {

@@ -14,13 +14,6 @@ set(CAFFE_TARGET_VERSION "1.0.0-rc3" CACHE STRING "Caffe logical version")
 set(CAFFE_TARGET_SOVERSION "1.0.0-rc3" CACHE STRING "Caffe soname version")
 add_definitions(-DCAFFE_VERSION=${CAFFE_TARGET_VERSION})
 
-if(WIN32)
-	add_definitions(-DNOGDI)
-	add_definitions(-DNO_STRICT)
-	add_definitions(-DBOOST_ALL_NO_LIB)
-	link_directories("C:/Program Files/python36/libs")
-endif()
-
 # ---[ Using cmake scripts and modules
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/Modules)
 
@@ -53,8 +46,6 @@ include(cmake/Dependencies.cmake)
 if(UNIX OR APPLE)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -Wall")
 endif()
-
-
 
 caffe_set_caffe_link()
 
@@ -90,11 +81,7 @@ add_custom_target(lint COMMAND ${CMAKE_COMMAND} -P ${PROJECT_SOURCE_DIR}/cmake/l
 
 # ---[ pytest target
 if(BUILD_python)
-  if (WIN32)
-    add_custom_target(pytest COMMAND python -m unittest discover -s caffe/test WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/python )
-  else()
-    add_custom_target(pytest COMMAND python${python_version} -m unittest discover -s caffe/test WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/python )
-  endif()
+  add_custom_target(pytest COMMAND python${python_version} -m unittest discover -s caffe/test WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/python )
   add_dependencies(pytest pycaffe)
 endif()
 

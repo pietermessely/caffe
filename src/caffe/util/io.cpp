@@ -22,10 +22,6 @@
 #include <map>
 #include <string>
 #include <vector>
-#ifdef _WIN32
-#include <io.h>
-#include <fstream>
-#endif
 
 #include "caffe/common.hpp"
 #include "caffe/proto/caffe.pb.h"
@@ -63,10 +59,6 @@ void WriteProtoToTextFile(const Message& proto, const char* filename) {
 }
 
 bool ReadProtoFromBinaryFile(const char* filename, Message* proto) {
-#ifdef WIN32
-	std::ifstream in(filename, std::ios::binary);
-	return proto->ParseFromIstream(&in);
-#else
   int fd = open(filename, O_RDONLY);
   CHECK_NE(fd, -1) << "File not found: " << filename;
   ZeroCopyInputStream* raw_input = new FileInputStream(fd);
@@ -74,11 +66,11 @@ bool ReadProtoFromBinaryFile(const char* filename, Message* proto) {
   coded_input->SetTotalBytesLimit(kProtoReadBytesLimit, 536870912);
 
   bool success = proto->ParseFromCodedStream(coded_input);
+
   delete coded_input;
   delete raw_input;
   close(fd);
   return success;
-#endif
 }
 
 void WriteProtoToBinaryFile(const Message& proto, const char* filename) {
@@ -91,8 +83,8 @@ cv::Mat ReadImageToCVMat(const string& filename, const int height,
     const int width, const int min_dim, const int max_dim,
     const bool is_color) {
   cv::Mat cv_img;
-  int cv_read_flag = (is_color ? cv::IMREAD_COLOR :
-    cv::IMREAD_GRAYSCALE);
+  int cv_read_flag = (is_color ? CV_LOAD_IMAGE_COLOR :
+    CV_LOAD_IMAGE_GRAYSCALE);
   cv::Mat cv_img_origin = cv::imread(filename, cv_read_flag);
   if (!cv_img_origin.data) {
     LOG(ERROR) << "Could not open or find file " << filename;
@@ -328,20 +320,19 @@ bool ReadXMLToAnnotatedDatum(const string& labelfile, const int img_height,
         } else if (v2.first == "difficult") {
           difficult = pt2.data() == "1";
         } else if (v2.first == "bndbox") {
-          int xmin = pt2.get("xmin", 0);
-          int ymin = pt2.get("ymin", 0);
-          int xmax = pt2.get("xmax", 0);
-          int ymax = pt2.get("ymax", 0);
+          float xmin = pt2.get<float>("xmin", 0);
+          float ymin = pt2.get<float>("ymin", 0);
+          float xmax = pt2.get<float>("xmax", 0);
+          float ymax = pt2.get<float>("ymax", 0);
           CHECK_NOTNULL(anno);
-
           LOG_IF(WARNING, xmin > width) << labelfile <<
-              " bounding box exceeds image width.";
+              " bounding box exceeds image boundary.";
           LOG_IF(WARNING, ymin > height) << labelfile <<
-              " bounding box exceeds image height.";
+              " bounding box exceeds image boundary.";
           LOG_IF(WARNING, xmax > width) << labelfile <<
-              " bounding box exceeds image width.";
+              " bounding box exceeds image boundary.";
           LOG_IF(WARNING, ymax > height) << labelfile <<
-              " bounding box exceeds image height.";
+              " bounding box exceeds image boundary.";
           LOG_IF(WARNING, xmin < 0) << labelfile <<
               " bounding box exceeds image boundary.";
           LOG_IF(WARNING, ymin < 0) << labelfile <<
@@ -351,9 +342,9 @@ bool ReadXMLToAnnotatedDatum(const string& labelfile, const int img_height,
           LOG_IF(WARNING, ymax < 0) << labelfile <<
               " bounding box exceeds image boundary.";
           LOG_IF(WARNING, xmin > xmax) << labelfile <<
-              " x bounding box irregular.";
+              " bounding box irregular.";
           LOG_IF(WARNING, ymin > ymax) << labelfile <<
-              " y bounding box irregular.";
+              " bounding box irregular.";
           // Store the normalized bounding box.
           NormalizedBBox* bbox = anno->mutable_bbox();
           bbox->set_xmin(static_cast<float>(xmin) / width);
@@ -676,8 +667,8 @@ cv::Mat DecodeDatumToCVMat(const Datum& datum, bool is_color) {
   CHECK(datum.encoded()) << "Datum not encoded";
   const string& data = datum.data();
   std::vector<char> vec_data(data.c_str(), data.c_str() + data.size());
-  int cv_read_flag = (is_color ? cv::IMREAD_COLOR :
-    cv::IMREAD_GRAYSCALE);
+  int cv_read_flag = (is_color ? CV_LOAD_IMAGE_COLOR :
+    CV_LOAD_IMAGE_GRAYSCALE);
   cv_img = cv::imdecode(vec_data, cv_read_flag);
   if (!cv_img.data) {
     LOG(ERROR) << "Could not decode datum ";

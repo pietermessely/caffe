@@ -2513,7 +2513,7 @@ void VisualizeBBox(const vector<cv::Mat>& images, const Blob<Dtype>* detections,
                                     &baseline);
     cv::rectangle(image, cv::Point(0, 0),
                   cv::Point(text.width, text.height + baseline),
-                  CV_RGB(255, 255, 255), cv::FILLED);
+                  CV_RGB(255, 255, 255), CV_FILLED);
     cv::putText(image, buffer, cv::Point(0, text.height + baseline / 2.),
                 fontface, scale, CV_RGB(0, 0, 0), thickness, 8);
     // Draw bboxes.
@@ -2539,7 +2539,7 @@ void VisualizeBBox(const vector<cv::Mat>& images, const Blob<Dtype>* detections,
         cv::rectangle(
             image, bottom_left_pt + cv::Point(0, 0),
             bottom_left_pt + cv::Point(text.width, -text.height-baseline),
-            color, cv::FILLED);
+            color, CV_FILLED);
         cv::putText(image, buffer, bottom_left_pt - cv::Point(0, baseline),
                     fontface, scale, CV_RGB(0, 0, 0), thickness, 8);
       }
@@ -2548,7 +2548,7 @@ void VisualizeBBox(const vector<cv::Mat>& images, const Blob<Dtype>* detections,
     if (!save_file.empty()) {
       if (!cap_out.isOpened()) {
         cv::Size size(image.size().width, image.size().height);
-        cv::VideoWriter outputVideo(save_file, cv::VideoWriter::fourcc('D', 'I', 'V', 'X'),
+        cv::VideoWriter outputVideo(save_file, CV_FOURCC('D', 'I', 'V', 'X'),
             30, size, true);
         cap_out = outputVideo;
       }

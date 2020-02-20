@@ -4,11 +4,7 @@ endif()
 
 # Known NVIDIA GPU achitectures Caffe can be compiled for.
 # This list will be used for CUDA_ARCH_NAME = All option
-if (WIN32)
-  set(Caffe_known_gpu_archs "30 35 50 60 61 70 75")
-else()
-  set(Caffe_known_gpu_archs "30 35 50 52 61 70 75")
-endif()
+set(Caffe_known_gpu_archs "20 21(20) 30 35 50 52 61 70 72 75")
 
 ################################################################################################
 # A function for automatic detection of GPUs installed  (if autodetection is enabled)
@@ -60,18 +56,11 @@ endfunction()
 #   caffe_select_nvcc_arch_flags(out_variable)
 function(caffe_select_nvcc_arch_flags out_variable)
   # List of arch names
-  set(__archs_names "Fermi" "Kepler" "Maxwell" "Pascal" "Volta" "All" "Manual")
-
-  if (WIN32)
+  set(__archs_names "Fermi" "Kepler" "Maxwell" "Volta" "Turing" "All" "Manual")
   set(__archs_name_default "All")
-  else()
-    set(__archs_name_default "All")
-  endif()
-  if (NOT WIN32)
-    if(NOT CMAKE_CROSSCOMPILING)
-      list(APPEND __archs_names "Auto")
-      set(__archs_name_default "Auto")
-    endif()
+  if(NOT CMAKE_CROSSCOMPILING)
+    list(APPEND __archs_names "Auto")
+    set(__archs_name_default "Auto")
   endif()
 
   # set CUDA_ARCH_NAME strings (so it will be seen as dropbox in CMake-Gui)
@@ -86,8 +75,8 @@ function(caffe_select_nvcc_arch_flags out_variable)
   endif()
 
   if(${CUDA_ARCH_NAME} STREQUAL "Manual")
-    #set(CUDA_ARCH_BIN ${Caffe_known_gpu_archs} CACHE STRING "Specify 'real' GPU architectures to build binaries for, BIN(PTX) format is supported")
-    # set(CUDA_ARCH_PTX "50"                     CACHE STRING "Specify 'virtual' PTX architectures to build PTX intermediate code for")
+    set(CUDA_ARCH_BIN ${Caffe_known_gpu_archs} CACHE STRING "Specify 'real' GPU architectures to build binaries for, BIN(PTX) format is supported")
+    set(CUDA_ARCH_PTX "50"                     CACHE STRING "Specify 'virtual' PTX architectures to build PTX intermediate code for")
     mark_as_advanced(CUDA_ARCH_BIN CUDA_ARCH_PTX)
   else()
     unset(CUDA_ARCH_BIN CACHE)
@@ -100,10 +89,10 @@ function(caffe_select_nvcc_arch_flags out_variable)
     set(__cuda_arch_bin "30 35")
   elseif(${CUDA_ARCH_NAME} STREQUAL "Maxwell")
     set(__cuda_arch_bin "50")
-  elseif(${CUDA_ARCH_NAME} STREQUAL "Pascal")
-    set(__cuda_arch_bin "61")
   elseif(${CUDA_ARCH_NAME} STREQUAL "Volta")
-    set(__cuda_arch_bin "70")
+    set(__cuda_arch_bin "70 72")
+  elseif(${CUDA_ARCH_NAME} STREQUAL "Turing")
+    set(__cuda_arch_bin "75")
   elseif(${CUDA_ARCH_NAME} STREQUAL "All")
     set(__cuda_arch_bin ${Caffe_known_gpu_archs})
   elseif(${CUDA_ARCH_NAME} STREQUAL "Auto")
@@ -183,9 +172,7 @@ endmacro()
 # Usage:
 #   detect_cuDNN()
 function(detect_cuDNN)
-  if (NOT WIN32)
-    set(CUDNN_ROOT "" CACHE PATH "CUDNN root folder")
-  endif()
+  set(CUDNN_ROOT "" CACHE PATH "CUDNN root folder")
 
   find_path(CUDNN_INCLUDE cudnn.h
             PATHS ${CUDNN_ROOT} $ENV{CUDNN_ROOT} ${CUDA_TOOLKIT_INCLUDE}
@@ -194,26 +181,19 @@ function(detect_cuDNN)
   # dynamic libs have different suffix in mac and linux
   if(APPLE)
     set(CUDNN_LIB_NAME "libcudnn.dylib")
-  elseif(WIN32)
-    set(CUDNN_LIB_NAME "cudnn.lib")
   else()
     set(CUDNN_LIB_NAME "libcudnn.so")
   endif()
-  #message(STATUS "cudnn_lib_name: " ${CUDNN_LIB_NAME})
+
   get_filename_component(__libpath_hist ${CUDA_CUDART_LIBRARY} PATH)
   find_library(CUDNN_LIBRARY NAMES ${CUDNN_LIB_NAME}
    PATHS ${CUDNN_ROOT} $ENV{CUDNN_ROOT} ${CUDNN_INCLUDE} ${__libpath_hist} ${__libpath_hist}/../lib
    DOC "Path to cuDNN library.")
-
-  if(CUDNN_INCLUDE)
-    message(STATUS "CUDNN_INCLUDE exists " ${CUDNN_INCLUDE})
-  endif()
-  if(CUDNN_LIBRARY)
-    message(STATUS "CUDNN_LIBRARY exists ${CUDNN_LIBRARY}")
-  endif()
+  
   if(CUDNN_INCLUDE AND CUDNN_LIBRARY)
     set(HAVE_CUDNN  TRUE PARENT_SCOPE)
     set(CUDNN_FOUND TRUE PARENT_SCOPE)
+
     file(READ ${CUDNN_INCLUDE}/cudnn.h CUDNN_VERSION_FILE_CONTENTS)
 
     # cuDNN v3 and beyond
@@ -264,7 +244,7 @@ set(HAVE_CUDA TRUE)
 message(STATUS "CUDA detected: " ${CUDA_VERSION})
 include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
 list(APPEND Caffe_LINKER_LIBS ${CUDA_CUDART_LIBRARY}
-                              ${CUDA_curand_LIBRARY} ${CUDA_CUBLAS_LIBRARIES})
+                              ${CUDA_curand_LIBRARY} -lcublas)
 
 # cudnn detection
 if(USE_CUDNN)

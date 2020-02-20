@@ -3,19 +3,15 @@ if(NOT HAVE_PYTHON)
   return()
 endif()
 
+include_directories(${PYTHON_INCLUDE_DIRS} ${NUMPY_INCLUDE_DIR} ${Boost_INCLUDE_DIRS})
 file(GLOB_RECURSE python_srcs ${PROJECT_SOURCE_DIR}/python/*.cpp)
 
 add_library(pycaffe SHARED ${python_srcs})
-caffe_default_properties(pycaffe)
+target_link_libraries(pycaffe ${Caffe_LINK} ${PYTHON_LIBRARIES} ${Boost_LIBRARIES})
 set_target_properties(pycaffe PROPERTIES PREFIX "" OUTPUT_NAME "_caffe")
-target_include_directories(pycaffe PUBLIC ${PYTHON_INCLUDE_DIRS} ${NUMPY_INCLUDE_DIR} ${Boost_INCLUDE_DIRS})
-target_link_libraries(pycaffe PUBLIC ${Caffe_LINK} ${PYTHON_LIBRARIES} ${Boost_LIBRARIES})
+caffe_default_properties(pycaffe)
 
-
-
-if(MSVC)
-   set_target_properties(pycaffe PROPERTIES SUFFIX ".pyd")
-elseif(UNIX OR APPLE)
+if(UNIX OR APPLE)
     set(__linkname "${PROJECT_SOURCE_DIR}/python/caffe/_caffe.so")
     add_custom_command(TARGET pycaffe POST_BUILD
                        COMMAND ln -sf $<TARGET_LINKER_FILE:pycaffe> "${__linkname}"
